@@ -62,7 +62,11 @@
     "release": "node release.js",
     "release:patch": "node release.js patch",
     "release:minor": "node release.js minor",
-    "release:major": "node release.js major"
+    "release:major": "node release.js major",
+    "release:beta": "node release.js prepatch beta",
+    "release:alpha": "node release.js prepatch alpha",
+    "release:rc": "node release.js prepatch rc",
+    "release:next": "node release.js prerelease"
   },
   "repository": {
     "type": "git",

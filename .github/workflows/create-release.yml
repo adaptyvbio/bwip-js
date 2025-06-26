@@ -1,0 +1,140 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on any tag starting with 'v'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Build distribution files
+        run: |
+          bun run build
+          
+          # Create other distribution formats
+          cp dist/bwip-js-node.js dist/bwip-js.js
+          
+          # ES module versions
+          echo 'import bwipjs from "./bwip-js-node.js"; export default bwipjs; export const { toBuffer, toSVG, raw, render, request, FontLib, loadFont, BWIPP_VERSION, BWIPJS_VERSION } = bwipjs;' > dist/bwip-js-node.mjs
+          cp dist/bwip-js-node.mjs dist/bwip-js.mjs
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ github.ref }}^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, including all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%an)" --no-merges)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.get_version.outputs.TAG_NAME }}"
+            COMMITS=$(git log ${PREVIOUS_TAG}..${{ steps.get_version.outputs.TAG_NAME }} --pretty=format:"- %s (%an)" --no-merges)
+          fi
+          
+          # Create changelog content
+          cat > RELEASE_NOTES.md << EOF
+          ## What's Changed in v${{ steps.get_version.outputs.VERSION }}
+          
+          ### 🚀 Features
+          - Support for raw bytes encoding via new \`bytes\` option
+          - Accepts Buffer or Uint8Array for binary data
+          - Preserves all byte values (0x00-0xFF) without UTF-8 conversion
+          - Automatic \`binarytext\` flag when using bytes option
+          
+          ### 📦 Installation
+          \`\`\`bash
+          npm install @adaptyvbio/bwip-js@${{ steps.get_version.outputs.VERSION }}
+          \`\`\`
+          
+          ### 💡 Usage Example
+          \`\`\`javascript
+          const bwipjs = require('@adaptyvbio/bwip-js');
+          
+          // Using raw bytes
+          const png = await bwipjs.toBuffer({
+              bcid: 'datamatrix',
+              bytes: Buffer.from([0x00, 0xFF, 0xFE]),
+              scale: 3
+          });
+          \`\`\`
+          
+          ### 📝 Commits
+          $COMMITS
+          
+          ### 📄 Full Changelog
+          EOF
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ steps.get_version.outputs.TAG_NAME }}" >> RELEASE_NOTES.md
+          else
+            echo "This is the first release!" >> RELEASE_NOTES.md
+          fi
+          
+          # Set multiline output
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Determine release type
+        id: release_type
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "PRERELEASE=true" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Pre-release v$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Release v$VERSION" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.TAG_NAME }}
+          name: ${{ steps.release_type.outputs.RELEASE_NAME }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: ${{ steps.release_type.outputs.PRERELEASE }}
+          files: |
+            dist/bwip-js-node.js
+            dist/bwip-js-node.mjs
+            dist/bwip-js-node.d.ts
+            dist/bwip-js.js
+            dist/bwip-js.mjs
+            dist/bwip-js.d.ts
+            README-npm.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Trigger NPM Publish
+        if: success()
+        run: |
+          echo "🎉 GitHub Release created successfully!"
+          echo "📦 The npm-publish workflow will now be triggered automatically"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get_version.outputs.TAG_NAME }}"

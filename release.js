@@ -32,21 +32,26 @@ const exec = (cmd, options = {}) => {
 // Parse command line arguments
 const args = process.argv.slice(2);
 const versionType = args[0] || 'patch'; // patch, minor, major, or specific version
+const prereleaseType = args[1]; // beta, alpha, rc, etc.
 
 // Validate version type
-const validTypes = ['patch', 'minor', 'major'];
+const validTypes = ['patch', 'minor', 'major', 'prepatch', 'preminor', 'premajor', 'prerelease'];
 const isValidType = validTypes.includes(versionType) || /^\d+\.\d+\.\d+/.test(versionType);
 
 if (!isValidType) {
   log.error(`Invalid version type: ${versionType}`);
   console.log('\nUsage:');
-  console.log('  node release.js [patch|minor|major|x.y.z]');
+  console.log('  node release.js [type] [prerelease-id]');
   console.log('\nExamples:');
-  console.log('  node release.js           # Bumps patch version (default)');
-  console.log('  node release.js patch     # Bumps patch version: 1.0.0 -> 1.0.1');
-  console.log('  node release.js minor     # Bumps minor version: 1.0.0 -> 1.1.0');
-  console.log('  node release.js major     # Bumps major version: 1.0.0 -> 2.0.0');
-  console.log('  node release.js 1.2.3     # Sets specific version');
+  console.log('  node release.js                    # Bumps patch version (default)');
+  console.log('  node release.js patch              # Bumps patch version: 1.0.0 -> 1.0.1');
+  console.log('  node release.js minor              # Bumps minor version: 1.0.0 -> 1.1.0');
+  console.log('  node release.js major              # Bumps major version: 1.0.0 -> 2.0.0');
+  console.log('  node release.js 1.2.3              # Sets specific version');
+  console.log('  node release.js prepatch beta      # Pre-release patch: 1.0.0 -> 1.0.1-beta.0');
+  console.log('  node release.js preminor alpha     # Pre-release minor: 1.0.0 -> 1.1.0-alpha.0');
+  console.log('  node release.js premajor rc        # Pre-release major: 1.0.0 -> 2.0.0-rc.0');
+  console.log('  node release.js prerelease         # Increment pre-release: 1.0.0-beta.0 -> 1.0.0-beta.1');
   process.exit(1);
 }
 
@@ -69,8 +74,21 @@ async function release() {
     log.info(`Current version: ${currentVersion}`);
 
     // Update version in package.json
-    log.info(`Bumping version (${versionType})...`);
-    const newVersion = exec(`npm version ${versionType} --no-git-tag-version`).trim();
+    log.info(`Bumping version (${versionType}${prereleaseType ? ' ' + prereleaseType : ''})...`);
+    let versionCommand = `npm version ${versionType}`;
+    
+    // Add prerelease identifier if provided
+    if (prereleaseType && validTypes.includes(versionType) && versionType.startsWith('pre')) {
+      versionCommand += ` --preid=${prereleaseType}`;
+    } else if (versionType === 'prerelease' && prereleaseType) {
+      versionCommand += ` --preid=${prereleaseType}`;
+    }
+    
+    versionCommand += ' --no-git-tag-version';
+    
+    let newVersion = exec(versionCommand).trim();
+    // Remove 'v' prefix if present from npm version output
+    newVersion = newVersion.replace(/^v/, '');
     log.success(`New version: ${newVersion}`);
 
     // Update version in source files
