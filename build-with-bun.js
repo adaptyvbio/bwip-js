@@ -73,7 +73,7 @@ const buildNode = async () => {
     // Handle specific transformations for exports.js
     if (file === 'exports.js') {
       // Replace the version placeholder
-      content = content.replace(/__BWIPJS_VERS__/g, '4.8.0 (2025-06-26)');
+      content = content.replace(/__BWIPJS_VERS__/g, '4.8.1 (2025-06-26)');
       
       // Remove the browser and react-native specific sections completely
       content = content.replace(/\/\/@@BEGIN-BROWSER-EXPORTS@@[\s\S]*?\/\/@@ENDOF-EXPORTS@@/g, '');
