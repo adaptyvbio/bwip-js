@@ -1,0 +1,106 @@
+name: Build and Publish to NPM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: true
+        type: string
+      tag:
+        description: 'NPM tag (latest, beta, next)'
+        required: false
+        default: 'latest'
+        type: string
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@adaptyvbio'
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Update package.json version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+      
+      - name: Extract version from release
+        if: github.event_name == 'release'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          npm version $VERSION --no-git-tag-version
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
+      - name: Build distribution files
+        run: |
+          echo "Building version $VERSION"
+          bun run build-with-bun.js
+          
+          # Also build other distribution formats
+          # Browser version
+          cp dist/bwip-js-node.js dist/bwip-js.js
+          
+          # ES module versions
+          echo 'import bwipjs from "./bwip-js-node.js"; export default bwipjs; export const { toBuffer, toSVG, raw, render, request, FontLib, loadFont, BWIPP_VERSION, BWIPJS_VERSION } = bwipjs;' > dist/bwip-js-node.mjs
+          cp dist/bwip-js-node.mjs dist/bwip-js.mjs
+          
+          # Update TypeScript definitions with proper types
+          echo "// Type definitions updated for @adaptyvbio/bwip-js" > dist/bwip-js-node.d.ts.tmp
+          cat dist/bwip-js-node.d.ts >> dist/bwip-js-node.d.ts.tmp
+          mv dist/bwip-js-node.d.ts.tmp dist/bwip-js-node.d.ts
+      
+      - name: Run tests
+        run: |
+          node test-bytes.js
+      
+      - name: Configure npm for scoped package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "@adaptyvbio:registry=https://registry.npmjs.org" >> ~/.npmrc
+      
+      - name: Publish to npm
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            npm publish --access public --tag ${{ inputs.tag }}
+          else
+            npm publish --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Create GitHub Release Assets
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/bwip-js-node.js
+            dist/bwip-js-node.mjs
+            dist/bwip-js-node.d.ts
+            dist/bwip-js.js
+            dist/bwip-js.mjs
+            dist/bwip-js.d.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
