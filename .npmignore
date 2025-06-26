@@ -3,8 +3,7 @@ src/
 *.ps
 
 # Development files
-test-bytes.js
-test-binary-barcode.png
+tests/
 build-with-bun.js
 demo.html
 release.js

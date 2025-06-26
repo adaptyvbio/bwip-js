@@ -1,7 +1,9 @@
-# // Barcode Writer in Pure JavaScript
-
+# @adaptyvbio/bwip-js - Barcode Writer in Pure JavaScript
 
 <a href="http://metafloor.github.io/bwip-js"><img alt="bwip-js" align="right" src="http://metafloor.github.io/bwip-js/images/bwip-js.png"></a>
+
+A fork of [bwip-js](https://github.com/metafloor/bwip-js) with added support for encoding raw bytes in barcodes.
+
 bwip-js is a translation to native JavaScript of the amazing code provided in [Barcode Writer in Pure PostScript](https://github.com/bwipp/postscriptbarcode).  The translated code can run on any modern browser or JavaScript-based server framework.
 
 The library has encoding modules for over 100 different barcode types and standards.
@@ -10,14 +12,133 @@ ones) are available.  An exhaustive list of supported barcode types can be
 found at the end of this document.  Barcodes are generated as PNG images (node-js and react-native)
 or to a canvas (browser) or as SVG (all platforms).
 
-> As of version 4.5, bwip-js has been partitioned into four platform-specific packages plus the cross-platform main package.  The sub-packages are currently experimental but are the solution to current build chains not properly supporting the `exports` map in `package.json`.  Please use them and report any issues you find.
+## New in This Fork: Raw Bytes Support
+
+This fork adds comprehensive support for encoding raw binary data through a new `bytes` option that accepts `Buffer` or `Uint8Array`. The library intelligently handles encoding optimization and supports the full byte range (0x00-0xFF).
+
+### Key Features
+
+- **🔧 New `bytes` option**: Direct binary data encoding without string conversion
+- **🎯 Smart encoding**: Automatic ASCII/base256 selection for optimal Data Matrix encoding
+- **📏 Size optimization**: 12x12 Data Matrix for ASCII-range bytes, 14x14+ for full binary
+- **🔄 Backward compatible**: Original `text` option continues to work unchanged
+- **⚡ Automatic handling**: No manual configuration needed
+
+### Usage Examples
+
+```javascript
+const bwipjs = require('@adaptyvbio/bwip-js');
+
+// Raw bytes with any values (0x00-0xFF)
+const png = await bwipjs.toBuffer({
+    bcid: 'datamatrix',
+    bytes: Buffer.from([0x00, 0xFF, 0xFE, 0x80, 0x7F]),
+    scale: 3
+});
+
+// Works with Uint8Array too
+const uint8Data = new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05]);
+const png2 = await bwipjs.toBuffer({
+    bcid: 'datamatrix',
+    bytes: uint8Data,
+    rows: 12,    // Will use 12x12 for these values
+    columns: 12,
+    scale: 5
+});
+
+// Mix with other barcode types
+const qrCode = await bwipjs.toBuffer({
+    bcid: 'qrcode',
+    bytes: Buffer.from([0xFF, 0x00, 0xAA, 0x55]),
+    scale: 4
+});
+```
+
+### Data Matrix Size Optimization
+
+The library automatically optimizes Data Matrix encoding:
+
+- **12x12 matrices**: For bytes with values < 0x80 (ASCII range)
+- **14x14+ matrices**: For bytes ≥ 0x80 using base256 encoding
+- **Automatic selection**: No manual encoding configuration required
+
+## Development & Releases
+
+This fork includes automated development workflows:
+
+### Quick Release
+```bash
+# Patch release (4.7.2 → 4.7.3)
+npm run release:patch
+
+# Minor release (4.7.2 → 4.8.0)
+npm run release:minor
+
+# Major release (4.7.2 → 5.0.0)
+npm run release:major
+
+# Pre-releases
+npm run release:beta    # 4.7.2 → 4.7.3-beta.0
+npm run release:alpha   # 4.7.2 → 4.7.3-alpha.0
+npm run release:rc      # 4.7.2 → 4.7.3-rc.0
+```
+
+### Automated Workflow
+1. **Release script** creates commit & tag
+2. **GitHub Action** triggers on tag push
+3. **GitHub Release** created with changelog
+4. **NPM package** published automatically
+
+### Testing
+```bash
+npm test                                    # Run comprehensive bytes support tests
+npm run build                               # Build distribution files
+
+# Specific test files
+node tests/test-bytes.js                    # Test basic bytes functionality
+node tests/test-datamatrix-capacity.js     # Test Data Matrix size limits
+node tests/test-final-verification.js      # Run complete verification suite
+node tests/test-12x12-fixed.js             # Test 12x12 Data Matrix with controlled data
+node tests/test-base256.js                  # Test base256 encoding for high bytes
+```
 
 ## Status 
 
-* Current bwip-js version is 4.6.0 (2025-04-20)
+* Current @adaptyvbio/bwip-js version is 4.7.2 (2025-06-26)
+* Based on bwip-js version 4.6.0 (2025-04-20)
 * Current BWIPP version is 2025-04-19
 * Node.js compatibility: 6.0
 * Browser compatibility: Edge, Firefox, Chrome
+
+## Why Use This Fork?
+
+### 🎯 **Problem Solved**
+The original bwip-js requires string conversion for binary data, which can corrupt bytes with values ≥ 0x80 (like 0xFF). This fork provides direct binary encoding without lossy conversions.
+
+### ✨ **Key Benefits**
+- **Direct binary encoding**: No string conversion, no data loss
+- **Smart optimization**: Automatic encoding selection for best performance
+- **100% compatible**: Drop-in replacement for existing code
+- **Enhanced Data Matrix**: Optimized 12x12 and 14x14+ matrix handling
+- **Developer friendly**: Automated releases, comprehensive tests
+
+### 🔧 **Perfect For**
+- Binary data encoding (sensor data, encrypted content)
+- Medical/industrial applications requiring exact byte preservation
+- Data Matrix barcodes with size constraints
+- Applications handling mixed ASCII/binary content
+
+### 📈 **Migration**
+```bash
+# Replace this:
+npm install bwip-js
+
+# With this:
+npm install @adaptyvbio/bwip-js
+
+# No code changes needed for existing functionality
+# Add bytes option for new binary encoding features
+```
 
 ## Supported Platforms
 
@@ -31,12 +152,17 @@ or to a canvas (browser) or as SVG (all platforms).
 
 ## Links
 
+### This Fork
+* [GitHub Repository](https://github.com/adaptyvbio/bwip-js)
+* [npm Page](https://www.npmjs.com/package/@adaptyvbio/bwip-js)
+* [Releases](https://github.com/adaptyvbio/bwip-js/releases)
+
+### Original Project
+* [Original bwip-js](https://github.com/metafloor/bwip-js)
 * [Home Page](http://metafloor.github.io/bwip-js/)
-* [GitHub Repository](https://github.com/metafloor/bwip-js)
 * [`bwipjs` Methods Reference](https://github.com/metafloor/bwip-js/wiki/Methods-Reference)
 * [Online Barcode Generator](http://metafloor.github.io/bwip-js/demo/demo.html)
 * [Online Barcode API](https://github.com/metafloor/bwip-js/wiki/Online-Barcode-API)
-* [npm Page](https://www.npmjs.com/package/bwip-js)
 * [BWIPP Documentation](https://github.com/bwipp/postscriptbarcode/wiki)
 * [Differences From BWIPP](https://github.com/metafloor/bwip-js/wiki/Differences-From-BWIPP)
 * [Supported Barcode Types](https://github.com/metafloor/bwip-js/wiki/BWIPP-Barcode-Types)
@@ -46,23 +172,31 @@ or to a canvas (browser) or as SVG (all platforms).
 
 ## Installation
 
-The bwip-js package has been partitioned into four platform-specific packages plus the main cross-platform package.  If you install the main package and cannot get its exports to work with your build stack, try installing a platform-specific package. The platform-specific packages are ES modules only, so you will need a modern build environment.  The exception is the node package, which also contains a `require()` compatible export.
+Install the @adaptyvbio fork with raw bytes support:
 
-
-You can download the main package using:
-
+```bash
+npm install @adaptyvbio/bwip-js
 ```
+
+The original bwip-js package and its platform-specific packages are also available:
+
+```bash
 npm install bwip-js
-```
-
-Or one of the platform-specific packages using:
-
-```
+# or platform-specific packages:
 npm install @bwip-js/node
 npm install @bwip-js/browser
 npm install @bwip-js/react-native
 npm install @bwip-js/generic
 ```
+
+### What's Different
+
+This fork maintains 100% API compatibility with the original while adding:
+
+- `bytes` option for direct binary data encoding
+- Automatic encoding optimization for Data Matrix
+- Enhanced error handling for invalid byte inputs
+- Full TypeScript support for new options
 
 The node, browser and react-native packages include both an image rending interface (`toCanvas()` on the browser, `toBuffer()` on node, `toDataURL()` on react-native), plus the SVG and custom drawing context interfaces.
 
@@ -98,6 +232,7 @@ Most of the public methods of the bwip-js export use an options object.  Only tw
 
 - `bcid` : The name of the barcode type/symbol.
 - `text` : The text to encode.
+- `bytes` : **NEW** - Buffer or Uint8Array for raw binary data encoding.
 
 All remaining options are optional, though you may find some quite useful.
 

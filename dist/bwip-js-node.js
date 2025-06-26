@@ -44405,6 +44405,12 @@ function _Render(encoder, options, drawing) {
         options.text = text;
         // Set binarytext flag to prevent UTF-8 encoding
         options.binarytext = true;
+        
+        // For Data Matrix, use base256 encoding to properly handle all byte values
+        if (options.bcid === 'datamatrix' || options.bcid === 'gs1datamatrix') {
+            options.encoding = 'base256';  // Use base256 encoding for binary data
+        }
+        
         // Remove bytes from options to avoid passing it to lower levels
         delete options.bytes;
     }
@@ -44488,6 +44494,11 @@ function ToRaw(bcid, text, options) {
             }
             // Set binarytext flag to prevent UTF-8 encoding
             options.binarytext = true;
+            
+            // For Data Matrix, use base256 encoding to properly handle all byte values
+            if (bcid === 'datamatrix' || bcid === 'gs1datamatrix') {
+                options.encoding = 'base256';  // Use base256 encoding for binary data
+            }
         }
     }
 

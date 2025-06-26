@@ -57,7 +57,7 @@
   },
   "scripts": {
     "build": "bun run build-with-bun.js",
-    "test": "node test-bytes.js",
+    "test": "node tests/test-bytes.js",
     "prepublishOnly": "bun run build",
     "release": "node release.js",
     "release:patch": "node release.js patch",

@@ -1,4 +1,4 @@
-const bwipjs = require('./dist/bwip-js-node.js');
+const bwipjs = require('../dist/bwip-js-node.js');
 const fs = require('fs');
 
 async function testBytesInput() {
