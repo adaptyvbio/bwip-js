@@ -53,7 +53,7 @@
   "browser": "./dist/bwip-js.js",
   "react-native": "./dist/bwip-js-rn.mjs",
   "bin": {
-    "bwip-js": "./bin/bwip-js.js"
+    "bwipjs": "./bin/bwip-js.js"
   },
   "scripts": {
     "build": "bun run build-with-bun.js",

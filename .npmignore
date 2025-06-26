@@ -7,6 +7,8 @@ test-bytes.js
 test-binary-barcode.png
 build-with-bun.js
 demo.html
+release.js
+RELEASE_NOTES.md
 
 # Examples and documentation
 examples/
@@ -35,3 +37,11 @@ Thumbs.db
 # Build artifacts that shouldn't be published
 *.log
 *.tmp
+
+# Reduce package size by excluding some large dist files
+dist/bwip-js-min.js
+dist/bwipp.mjs
+dist/bwip-js-gen.d.ts
+dist/bwip-js-gen.mjs
+dist/bwip-js-rn.d.ts
+dist/bwip-js-rn.mjs
