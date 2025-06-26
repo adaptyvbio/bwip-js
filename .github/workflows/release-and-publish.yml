@@ -81,7 +81,7 @@ jobs:
           mv dist/bwip-js-node.d.ts.tmp dist/bwip-js-node.d.ts
       
       - name: Run tests
-        run: node test-bytes.js
+        run: node tests/test-bytes.js
       
       - name: Generate changelog
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_release)
