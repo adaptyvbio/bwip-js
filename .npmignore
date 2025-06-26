@@ -1,0 +1,37 @@
+# Source files (only distribute built files)
+src/
+*.ps
+
+# Development files
+test-bytes.js
+test-binary-barcode.png
+build-with-bun.js
+demo.html
+
+# Examples and documentation
+examples/
+lib/demo.css
+
+# Git and CI
+.git/
+.github/
+.gitignore
+
+# Node modules (if accidentally included)
+node_modules/
+npm-debug.log*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts that shouldn't be published
+*.log
+*.tmp

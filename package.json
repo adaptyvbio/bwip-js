@@ -1,7 +1,7 @@
 {
-  "name": "bwip-js",
+  "name": "@adaptyvbio/bwip-js",
   "version": "4.6.0",
-  "description": "JavaScript barcode generator supporting over 100 types and standards.",
+  "description": "JavaScript barcode generator supporting over 100 types and standards with raw bytes support.",
   "exports": {
       ".": {
           "browser": {
@@ -56,11 +56,17 @@
     "bwip-js": "./bin/bwip-js.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "bun run build-with-bun.js",
+    "test": "node test-bytes.js",
+    "prepublishOnly": "bun run build"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/metafloor/bwip-js.git"
+    "url": "https://github.com/adaptyvbio/bwip-js.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
     "bar code",
