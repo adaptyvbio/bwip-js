@@ -334,6 +334,7 @@ function FixupOptions(opts) {
 var BWIPJS_OPTIONS = {
     bcid:1,
     text:1,
+    bytes:1,
     scale:1,
     scaleX:1,
     scaleY:1,
@@ -361,6 +362,24 @@ function Render(options, drawing) {
 
 // Called by the public exports
 function _Render(encoder, options, drawing) {
+    // Handle bytes input if provided
+    if (options.bytes) {
+        if (!(options.bytes instanceof Buffer) && !(options.bytes instanceof Uint8Array)) {
+            throw new TypeError('bwip-js: bytes option must be a Buffer or Uint8Array');
+        }
+        
+        // Convert bytes to a string that preserves all byte values
+        var text = '';
+        for (var i = 0; i < options.bytes.length; i++) {
+            text += String.fromCharCode(options.bytes[i]);
+        }
+        options.text = text;
+        // Set binarytext flag to prevent UTF-8 encoding
+        options.binarytext = true;
+        // Remove bytes from options to avoid passing it to lower levels
+        delete options.bytes;
+    }
+    
     var text = options.text;
     if (!text) {
         throw new ReferenceError('bwip-js: bar code text not specified.');
@@ -426,6 +445,21 @@ function ToRaw(bcid, text, options) {
         options = bcid;
         bcid = options.bcid;
         text = options.text;
+        
+        // Handle bytes input if provided
+        if (options.bytes) {
+            if (!(options.bytes instanceof Buffer) && !(options.bytes instanceof Uint8Array)) {
+                throw new TypeError('bwip-js: bytes option must be a Buffer or Uint8Array');
+            }
+            
+            // Convert bytes to a string that preserves all byte values
+            text = '';
+            for (var i = 0; i < options.bytes.length; i++) {
+                text += String.fromCharCode(options.bytes[i]);
+            }
+            // Set binarytext flag to prevent UTF-8 encoding
+            options.binarytext = true;
+        }
     }
 
     // The drawing interface is just needed for the pre-init() calls.
