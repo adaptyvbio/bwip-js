@@ -1,0 +1,222 @@
+name: Release and Publish
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on any tag starting with 'v'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0, 1.0.0-beta.1)'
+        required: true
+        type: string
+      tag:
+        description: 'NPM tag (latest, beta, next)'
+        required: false
+        default: 'latest'
+        type: string
+      create_release:
+        description: 'Create GitHub release'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  release-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@adaptyvbio'
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Update package.json version (manual workflow)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version
+          echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          echo "TAG_NAME=v${{ inputs.version }}" >> $GITHUB_ENV
+      
+      - name: Extract version from tag (tag push)
+        if: github.event_name == 'push'
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      
+      - name: Build distribution files
+        run: |
+          echo "Building version $VERSION"
+          bun run build
+          
+          # Create other distribution formats
+          cp dist/bwip-js-node.js dist/bwip-js.js
+          
+          # ES module versions
+          echo 'import bwipjs from "./bwip-js-node.js"; export default bwipjs; export const { toBuffer, toSVG, raw, render, request, FontLib, loadFont, BWIPP_VERSION, BWIPJS_VERSION } = bwipjs;' > dist/bwip-js-node.mjs
+          cp dist/bwip-js-node.mjs dist/bwip-js.mjs
+          
+          # Update TypeScript definitions with proper types
+          echo "// Type definitions for @adaptyvbio/bwip-js v$VERSION" > dist/bwip-js-node.d.ts.tmp
+          cat dist/bwip-js-node.d.ts >> dist/bwip-js-node.d.ts.tmp
+          mv dist/bwip-js-node.d.ts.tmp dist/bwip-js-node.d.ts
+      
+      - name: Run tests
+        run: node test-bytes.js
+      
+      - name: Generate changelog
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        id: changelog
+        run: |
+          # Get the previous tag
+          if [ "${{ github.event_name }}" == "push" ]; then
+            CURRENT_TAG="${{ env.TAG_NAME }}"
+          else
+            CURRENT_TAG="v${{ env.VERSION }}"
+          fi
+          
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, including all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%an)" --no-merges | head -20)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+            COMMITS=$(git log ${PREVIOUS_TAG}..$CURRENT_TAG --pretty=format:"- %s (%an)" --no-merges)
+          fi
+          
+          # Create changelog content
+          cat > RELEASE_NOTES.md << EOF
+          ## What's Changed in v${{ env.VERSION }}
+          
+          ### 🚀 Features
+          - Support for raw bytes encoding via new \`bytes\` option
+          - Accepts Buffer or Uint8Array for binary data
+          - Preserves all byte values (0x00-0xFF) without UTF-8 conversion
+          - Automatic \`binarytext\` flag when using bytes option
+          
+          ### 📦 Installation
+          \`\`\`bash
+          npm install @adaptyvbio/bwip-js@${{ env.VERSION }}
+          \`\`\`
+          
+          ### 💡 Usage Example
+          \`\`\`javascript
+          const bwipjs = require('@adaptyvbio/bwip-js');
+          
+          // Using raw bytes
+          const png = await bwipjs.toBuffer({
+              bcid: 'datamatrix',
+              bytes: Buffer.from([0x00, 0xFF, 0xFE]),
+              scale: 3
+          });
+          \`\`\`
+          
+          ### 📝 Commits
+          $COMMITS
+          
+          ### 📄 Full Changelog
+          EOF
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...$CURRENT_TAG" >> RELEASE_NOTES.md
+          else
+            echo "This is the first release!" >> RELEASE_NOTES.md
+          fi
+          
+          # Set multiline output
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Determine release type
+        id: release_type
+        run: |
+          VERSION=${{ env.VERSION }}
+          if [[ "$VERSION" == *"-"* ]]; then
+            echo "PRERELEASE=true" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Pre-release v$VERSION" >> $GITHUB_OUTPUT
+            
+            # Determine npm tag from version
+            if [[ "$VERSION" == *"-alpha"* ]]; then
+              echo "NPM_TAG=alpha" >> $GITHUB_OUTPUT
+            elif [[ "$VERSION" == *"-beta"* ]]; then
+              echo "NPM_TAG=beta" >> $GITHUB_OUTPUT
+            elif [[ "$VERSION" == *"-rc"* ]]; then
+              echo "NPM_TAG=rc" >> $GITHUB_OUTPUT
+            else
+              echo "NPM_TAG=next" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
+            echo "RELEASE_NAME=Release v$VERSION" >> $GITHUB_OUTPUT
+            echo "NPM_TAG=latest" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Configure npm for scoped package
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "@adaptyvbio:registry=https://registry.npmjs.org" >> ~/.npmrc
+      
+      - name: Publish to npm
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            npm publish --access public --tag ${{ inputs.tag }}
+          else
+            npm publish --access public --tag ${{ steps.release_type.outputs.NPM_TAG }}
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Create GitHub Release
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: ${{ steps.release_type.outputs.RELEASE_NAME }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: ${{ steps.release_type.outputs.PRERELEASE }}
+          files: |
+            dist/bwip-js-node.js
+            dist/bwip-js-node.mjs
+            dist/bwip-js-node.d.ts
+            dist/bwip-js.js
+            dist/bwip-js.mjs
+            dist/bwip-js.d.ts
+            README-npm.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ env.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **NPM Package**: [@adaptyvbio/bwip-js@${{ env.VERSION }}](https://www.npmjs.com/package/@adaptyvbio/bwip-js/v/${{ env.VERSION }})" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "push" ] || [ "${{ inputs.create_release }}" == "true" ]; then
+            echo "- **GitHub Release**: [v${{ env.VERSION }}](https://github.com/${{ github.repository }}/releases/tag/${{ env.TAG_NAME }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the npm package at https://www.npmjs.com/package/@adaptyvbio/bwip-js" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test installation: \`npm install @adaptyvbio/bwip-js@${{ env.VERSION }}\`" >> $GITHUB_STEP_SUMMARY
