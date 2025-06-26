@@ -1,6 +1,6 @@
 
 // exports.js
-const BWIPJS_VERSION = '__BWIPJS_VERS__';
+const BWIPJS_VERSION = 'v4.7.0 (2025-06-26)';
 
 //@@BEGIN-NODE-JS-EXPORTS@@
 var url = require('url');
