@@ -44185,7 +44185,7 @@ function LoadFont() {
 // exports.js
 
 // exports.js
-const BWIPJS_VERSION = '4.7.3 (2025-06-26)';
+const BWIPJS_VERSION = '4.8.0 (2025-06-26)';
 
 
 var url = require('url');
